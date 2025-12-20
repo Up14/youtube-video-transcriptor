@@ -378,12 +378,64 @@ class CaptionDownloader:
                     error_message=f"Something went wrong: {error_msg}"
                 )
         
-        except Exception as e:
+        except UnicodeDecodeError as e:
+            # Root cause fix: Handle encoding errors when reading caption files
             return CaptionResult(
                 success=False,
                 caption_data=[],
                 caption_text='',
-                error_message="Something went wrong. Please try again or check your internet connection."
+                error_message=f"Failed to decode caption file. Encoding error: {str(e)}"
+            )
+        except ValueError as e:
+            # Root cause fix: Handle value errors (e.g., timestamp parsing errors)
+            error_msg = str(e)
+            if 'timestamp' in error_msg.lower() or 'time' in error_msg.lower():
+                return CaptionResult(
+                    success=False,
+                    caption_data=[],
+                    caption_text='',
+                    error_message=f"Failed to parse caption timestamps: {error_msg}"
+                )
+            return CaptionResult(
+                success=False,
+                caption_data=[],
+                caption_text='',
+                error_message=f"Invalid data format: {error_msg}"
+            )
+        except KeyError as e:
+            # Root cause fix: Handle missing keys in metadata or caption data
+            return CaptionResult(
+                success=False,
+                caption_data=[],
+                caption_text='',
+                error_message=f"Missing required data: {str(e)}"
+            )
+        except Exception as e:
+            # Root cause fix: Log the actual exception instead of hiding it
+            # This helps identify the real problem instead of showing a generic message
+            import traceback
+            error_type = type(e).__name__
+            error_details = str(e)
+            
+            # Provide specific error message based on exception type
+            if 'Connection' in error_type or 'Timeout' in error_type or 'Network' in error_type:
+                error_message = f"Network error: {error_details}. Please check your internet connection."
+            elif 'Permission' in error_type or 'Access' in error_type:
+                error_message = f"Access denied: {error_details}"
+            elif 'FileNotFound' in error_type or 'IOError' in error_type:
+                error_message = f"File operation failed: {error_details}"
+            else:
+                # For unknown errors, show the actual error type and message
+                error_message = f"Error ({error_type}): {error_details}"
+            
+            # Log full traceback for debugging (in production, you might want to log to a file)
+            print(f"DEBUG: Full error traceback:\n{traceback.format_exc()}")
+            
+            return CaptionResult(
+                success=False,
+                caption_data=[],
+                caption_text='',
+                error_message=error_message
             )
     
     def cleanup(self):
